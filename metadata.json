@@ -1,0 +1,7 @@
+{
+  "uuid": "audio-switch2@thefuchsbau.eu",
+  "name": "Audio Switch2",
+  "description": "On-Click Audio Output Device Switch",
+  "version": "2.0",
+  "cinnamon-version": ["6.6"]
+}
