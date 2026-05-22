@@ -1,0 +1,7 @@
+{
+    "selected-sinks": {
+        "type": "array",
+        "default": [],
+        "description": "List of sink names to cycle through"
+    }
+}
