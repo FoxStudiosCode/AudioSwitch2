@@ -120,6 +120,7 @@ AudioSwitch.prototype = {
         Logger.debug("_onReady called");
         this._loadSettings();
         this._refreshSinks();
+        this._logAllSinks();
         this._updateUI();
         this._rebuildMenu();
     },
@@ -144,6 +145,16 @@ AudioSwitch.prototype = {
         }
         Logger.warn("Sink not found: " + name);
         return false;
+    },
+    _logAllSinks() {
+    Logger.debug("=== Available Sinks ===");
+    for (let sink of this._sinks) {
+        Logger.debug(`Name: ${sink.get_name()}`);
+        Logger.debug(`Description: ${sink.get_description()}`);
+        Logger.debug(`State: ${sink.get_state()}`);
+        Logger.debug(`---`);
+    }
+    Logger.debug("=======================");
     },
 
 
@@ -199,54 +210,57 @@ _cycleSink() {
     this._setSinkByName(next);
 },
 
-    _rebuildMenu() {
-        if (!this.menu) return;
-        Logger.debug("Rebuilding menu");
+_rebuildMenu() {
+    if (!this.menu) return;
+    Logger.debug("Rebuilding menu");
+    this.menu.removeAll();
+    this._refreshSinks();
 
-        this.menu.removeAll();
-        this._refreshSinks();
+    let title = new PopupMenu.PopupMenuItem("Select up to 2 outputs");
+    title.actor.reactive = false;
+    this.menu.addMenuItem(title);
+    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        let title = new PopupMenu.PopupMenuItem("Select up to 2 outputs");
-        title.actor.reactive = false;
-        this.menu.addMenuItem(title);
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    // Store items for later state updates
+    this.menuItems = new Map();
 
-        for (let sink of this._sinks) {
-            let name = sink.get_name();
-            let isSelected = this._selectedSinks.indexOf(name) !== -1;
+    for (let sink of this._sinks) {
+        let name = sink.get_name();
+        let isSelected = this._selectedSinks.indexOf(name) !== -1;
+        let item = new PopupMenu.PopupSwitchMenuItem(
+            this._formatSinkName(sink),
+            isSelected
+        );
+        // Store the item keyed by sink name
+        this.menuItems.set(name, item);
+        item.connect("toggled", (_, state) => {
+            this._toggleSelection(name, state);
+        });
+        this.menu.addMenuItem(item);
+    }
+},
 
-            let item = new PopupMenu.PopupSwitchMenuItem(
-                this._formatSinkName(sink),
-                isSelected
-            );
-
-            item.connect("toggled", (_, state) => {
-                this._toggleSelection(name, state);
-            });
-
-            this.menu.addMenuItem(item);
+_toggleSelection(name, state) {
+    Logger.debug("Toggle " + name + " to " + state);
+    let idx = this._selectedSinks.indexOf(name);
+    if (state && idx === -1) {
+        if (this._selectedSinks.length >= 2) {
+            let removed = this._selectedSinks.shift();
+            Logger.debug("Removed " + removed + " to keep max 2");
+            // Update the removed item's state to false
+            let removedItem = this.menuItems.get(removed);
+            if (removedItem) removedItem.setToggleState(false);
         }
-    },
-
-    _toggleSelection(name, state) {
-        Logger.debug("Toggle " + name + " to " + state);
-        let idx = this._selectedSinks.indexOf(name);
-
-        if (state && idx === -1) {
-            if (this._selectedSinks.length >= 2) {
-                let removed = this._selectedSinks.shift();
-                Logger.debug("Removed " + removed + " to keep max 2");
-            }
-            this._selectedSinks.push(name);
-        }
-
-        if (!state && idx !== -1) {
-            this._selectedSinks.splice(idx, 1);
-        }
-
-        this._saveSettings();
-        this._rebuildMenu();
-    },
+        this._selectedSinks.push(name);
+    } else if (!state && idx !== -1) {
+        this._selectedSinks.splice(idx, 1);
+    }
+    // Update the current item's state (redundant if already set, but ensures consistency)
+    let currentItem = this.menuItems.get(name);
+    if (currentItem) currentItem.setToggleState(state);
+    this._saveSettings();
+    // Do NOT rebuild the menu – just update the item's appearance
+},
 
     // ---------------- UI ----------------
     _updateUI() {
