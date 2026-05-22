@@ -1,20 +1,58 @@
-// Audio Switch Applet (Refactored) - STANDARD ICONS TEST
-// Uses only freedesktop standard icon names
+// Custom Applet for Cinnamon Panel
+// Provides on click switch functionality to the active audio devices
+
+// Author: Niclas Fuchs
+// created: 24.08.25
+// updated: 23.05.26
+
+// Version: 2.2
+
+// TODO:
+//  - implement sink software selection though config point
+//  - fix multiple instances Issue
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 const Applet = imports.ui.applet;
 const PopupMenu = imports.ui.popupMenu;
 const AppletPopupMenu = imports.ui.applet.AppletPopupMenu;
 const Cvc = imports.gi.Cvc;
+const GLib = imports.gi.GLib;
 
 const AppName = "AudioSwitch2";
 const AppNameLogPrefix = "[" + AppName + "]";
 
+
+// ---------------- Config and Logger ------------------
+// ---------------- CONFIG & LOGGER ----------------
+// Default log level: 2 (info)
+let LOG_LEVEL = 2;
+
+function loadConfig(metadata) {
+    if (!metadata || !metadata.path) return;
+    const configPath = metadata.path + '/config.json';
+    try {
+        let [success, content] = GLib.file_get_contents(configPath);
+        if (success && content) {
+            let config = JSON.parse(content);
+            if (typeof config.logLevel === 'number' && config.logLevel >= 0 && config.logLevel <= 3) {
+                LOG_LEVEL = config.logLevel;
+            }
+        }
+    } catch(e) {
+        // Ignore errors – use default
+    }
+}
+
+// Logger uses the current LOG_LEVEL (can be changed later)
 const Logger = {
-    debug: (m) => global.log(AppNameLogPrefix + "[DEBUG] " + m),
-    info: (m) => global.log(AppNameLogPrefix + "[INFO] " + m),
-    warn: (m) => global.log(AppNameLogPrefix + "[WARN] " + m),
-    error: (m) => global.log(AppNameLogPrefix + "[ERROR] " + m),
+    error: (msg) => { if (LOG_LEVEL >= 0) global.log("[AudioSwitch][ERROR] " + msg); },
+    warn:  (msg) => { if (LOG_LEVEL >= 1) global.log("[AudioSwitch][WARN]  " + msg); },
+    info:  (msg) => { if (LOG_LEVEL >= 2) global.log("[AudioSwitch][INFO]  " + msg); },
+    debug: (msg) => { if (LOG_LEVEL >= 3) global.log("[AudioSwitch][DEBUG] " + msg); }
 };
+
+
 
 // ---------------- ICONS (all standard symbolic) ----------------
 const ICONS = {
@@ -22,6 +60,8 @@ const ICONS = {
     monitor: "video-display-symbolic",        // standard monitor/screen icon
     fallback: "audio-card-symbolic"           // generic audio icon
 };
+
+
 
 // ---------------- APPLET ----------------
 function AudioSwitch(metadata, orientation, panelHeight, instanceId) {
@@ -34,6 +74,8 @@ AudioSwitch.prototype = {
     _init(metadata, orientation, panelHeight, instanceId) {
         try {
             Applet.IconApplet.prototype._init.call(this, orientation, panelHeight, instanceId);
+
+            loadConfig(metadata);
 
             // Log that initialization started
             Logger.info("Initializing applet");
